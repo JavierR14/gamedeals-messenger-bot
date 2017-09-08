@@ -1,4 +1,5 @@
 from flask import Flask, request
+from flask_sqlalchemy import SQLAlchemy
 import json
 import requests
 
