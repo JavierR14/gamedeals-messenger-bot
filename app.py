@@ -86,7 +86,7 @@ def send_message(token, recipient, text):
         query_result = Posts.query.filter(Posts.name == submission.id).first()
         if query_result is None:
             # Post has never been created before
-            newPost = Posts(submission.id, submission.title, submission.url)
+            newPost = Posts(submission.id, submission.url, submission.title)
             user.posts.append(newPost)
             db.session.commit()
             if submission.title is not None:
@@ -150,7 +150,7 @@ class Posts(db.Model):
     title = db.Column(db.String, nullable=True)
     url = db.Column(db.String, nullable=False)
 
-    def __init__(self, name, title=None, url):
+    def __init__(self, name, url, title=None):
         self.name = name
         self.title = title
         self.url = url
