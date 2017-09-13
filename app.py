@@ -71,6 +71,8 @@ def messaging_events(payload):
 
 def send_message(token, recipient, text):
     #Send message back to sender who is now the recipient
+    text = text.decode('unicode_escape')
+    
     if "game" in text.lower():
         subreddit_name = "GameDeals"
     elif "ps4" in text.lower():
