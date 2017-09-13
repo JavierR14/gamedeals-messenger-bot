@@ -72,7 +72,7 @@ def messaging_events(payload):
 def send_message(token, recipient, text):
     #Send message back to sender who is now the recipient
     text = text.decode('unicode_escape')
-    
+
     if "game" in text.lower():
         subreddit_name = "GameDeals"
     elif "ps4" in text.lower():
@@ -83,6 +83,7 @@ def send_message(token, recipient, text):
         subreddit_name = "steamdeals"
 
     user = get_or_create(db.session, Users, name=recipient)
+    newContent = False
 
     for submission in reddit.subreddit(subreddit_name).new(limit=25):
         query_result = Posts.query.filter(Posts.name == submission.id).first()
@@ -91,37 +92,49 @@ def send_message(token, recipient, text):
             newPost = Posts(submission.id, submission.url, submission.title)
             user.posts.append(newPost)
             db.session.commit()
-            if submission.title is not None:
-                payload = submission.title
-            else:
-                payload = submission.title + '\n' + submission.url
-            break
+
+            newContent = True
+            payload = submission.title + '\n' + submission.url
+
         elif user not in query_result.users:
             # Post exists but has not been sent to this user yet
             user.posts.append(query_result)
             db.session.commit()
-            if submission.title is not None:
-                payload = submission.title
-            else:
-                payload = submission.title + '\n' + submission.url
-            break
+
+            newContent = True
+            payload = submission.title + '\n' + submission.url
         else:
             continue
 
+        r = requests.post("https://graph.facebook.com/v2.6/me/messages",
+            params={"access_token": token},
+            data=json.dumps({
+                "recipient": {"id": recipient},
+                "message": {
+                    "text": payload,
+                    "quick_replies": quick_reply_list
+                }
+            }),
+            headers={'Content-type': 'application/json'})
 
-    r = requests.post("https://graph.facebook.com/v2.6/me/messages",
-        params={"access_token": token},
-        data=json.dumps({
-            "recipient": {"id": recipient},
-            "message": {
-                "text": payload,
-                "quick_replies": quick_reply_list
-            }
-        }),
-        headers={'Content-type': 'application/json'})
+        if r.status_code != requests.codes.ok:
+            print(r.text)
 
-    if r.status_code != requests.codes.ok:
-        print(r.text)
+    if not newContent:
+        r = requests.post("https://graph.facebook.com/v2.6/me/messages",
+            params={"access_token": token},
+            data=json.dumps({
+                "recipient": {"id": recipient},
+                "message": {
+                    "text": "No new deals since last update for " + text + ".",
+                    "quick_replies": quick_reply_list
+                }
+            }),
+            headers={'Content-type': 'application/json'})
+
+        if r.status_code != requests.codes.ok:
+            print(r.text)
+
 
 def get_or_create(session, model, **kwargs):
     instance = session.query(model).filter_by(**kwargs).first()
