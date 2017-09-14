@@ -13,8 +13,15 @@ reddit = praw.Reddit(client_id=os.environ['REDDIT_CLIENT_ID'], client_secret=os.
 # Page Access Token from FB
 PAT = os.environ['PAGE_ACCESS_TOKEN']
 
+introMessage = "Hi! All Gaming Deals here. I'll give you all of the gaming deals as they release depending on your preferences! 🙂 \n" + "\n" + "Press any of the Quick-Reply buttons below to instantly receive deals from the chosen category." + "\n" + "\n" + "Say 'SUBSCRIBE <category>' to *start* receiving deals automatically from that category." + "\n" + "\n" + "Send the message 'UNSUBSCRIBE <category>' to *stop* receiving deals automatically from that category." + "\n" + "\n" + "_Categories_" + "\n" + "*GameDeals*" + "\n" + "*PS4Deals*" + "\n" + "*XboxDeals*" + "\n" + "*SteamDeals*"
+
 #Temporary. TODO: Figure out how to auto-send notifications without requiring user message first
 quick_reply_list = [
+    {
+        "content_type": "text",
+        "title": "Help",
+        "payload": introMessage
+    },
     {
         "content_type": "text",
         "title": "Game Deals",
@@ -73,67 +80,89 @@ def send_message(token, recipient, text):
     #Send message back to sender who is now the recipient
     text = text.decode('unicode_escape')
 
+    requiresIntro = False
+
     if "game" in text.lower():
         subreddit_name = "GameDeals"
     elif "ps4" in text.lower():
         subreddit_name = "PS4Deals"
     elif "xbox" in text.lower():
         subreddit_name = "GreatXboxDeals"
-    else:
+    elif "steam" in text.lower():
         subreddit_name = "steamdeals"
+    else:
+        subreddit_name = ""
+
+    if not Users.query.filter(Users.name == recipient).first() or not subreddit_name:
+        requiresIntro = True
+        r = requests.post("https://graph.facebook.com/v2.6/me/messages",
+            params={"access_token": token},
+            data=json.dumps({
+                "recipient": {"id": recipient},
+                "message": {
+                    "text": introMessage,
+                    "quick_replies": quick_reply_list
+                }
+            }),
+            headers={'Content-type': 'application/json'})
+
+        if r.status_code != requests.codes.ok:
+            print(r.text)
+
 
     user = get_or_create(db.session, Users, name=recipient)
     newContent = False
 
-    for submission in reddit.subreddit(subreddit_name).new(limit=25):
-        query_result = Posts.query.filter(Posts.name == submission.id).first()
-        if query_result is None:
-            # Post has never been created before
-            newPost = Posts(submission.id, submission.url, submission.title)
-            user.posts.append(newPost)
-            db.session.commit()
+    if not requiresIntro:
+        for submission in reddit.subreddit(subreddit_name).new(limit=25):
+            query_result = Posts.query.filter(Posts.name == submission.id).first()
+            if query_result is None:
+                # Post has never been created before
+                newPost = Posts(submission.id, submission.url, submission.title)
+                user.posts.append(newPost)
+                db.session.commit()
 
-            newContent = True
-            payload = submission.title + '\n' + submission.url
+                newContent = True
+                payload = submission.title + '\n' + submission.url
 
-        elif user not in query_result.users:
-            # Post exists but has not been sent to this user yet
-            user.posts.append(query_result)
-            db.session.commit()
+            elif user not in query_result.users:
+                # Post exists but has not been sent to this user yet
+                user.posts.append(query_result)
+                db.session.commit()
 
-            newContent = True
-            payload = submission.title + '\n' + submission.url
-        else:
-            continue
+                newContent = True
+                payload = submission.title + '\n' + submission.url
+            else:
+                continue
 
-        r = requests.post("https://graph.facebook.com/v2.6/me/messages",
-            params={"access_token": token},
-            data=json.dumps({
-                "recipient": {"id": recipient},
-                "message": {
-                    "text": payload,
-                    "quick_replies": quick_reply_list
-                }
-            }),
-            headers={'Content-type': 'application/json'})
+            r = requests.post("https://graph.facebook.com/v2.6/me/messages",
+                params={"access_token": token},
+                data=json.dumps({
+                    "recipient": {"id": recipient},
+                    "message": {
+                        "text": payload,
+                        "quick_replies": quick_reply_list
+                    }
+                }),
+                headers={'Content-type': 'application/json'})
 
-        if r.status_code != requests.codes.ok:
-            print(r.text)
+            if r.status_code != requests.codes.ok:
+                print(r.text)
 
-    if not newContent:
-        r = requests.post("https://graph.facebook.com/v2.6/me/messages",
-            params={"access_token": token},
-            data=json.dumps({
-                "recipient": {"id": recipient},
-                "message": {
-                    "text": "No new deals since last update for " + text + ".",
-                    "quick_replies": quick_reply_list
-                }
-            }),
-            headers={'Content-type': 'application/json'})
+        if not newContent:
+            r = requests.post("https://graph.facebook.com/v2.6/me/messages",
+                params={"access_token": token},
+                data=json.dumps({
+                    "recipient": {"id": recipient},
+                    "message": {
+                        "text": "No new deals since last update for " + text + ".",
+                        "quick_replies": quick_reply_list
+                    }
+                }),
+                headers={'Content-type': 'application/json'})
 
-        if r.status_code != requests.codes.ok:
-            print(r.text)
+            if r.status_code != requests.codes.ok:
+                print(r.text)
 
 
 def get_or_create(session, model, **kwargs):
