@@ -8,10 +8,10 @@ import requests
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = os.environ['DATABASE_URL']
 db = SQLAlchemy(app)
-reddit = praw.Reddit(client_id='LMO9ciPUcNHmVQ', client_secret='bh-ypNImIGyoogFJFOKStuVI1ck', user_agent='web:com.gamedealsnotifierapp:v0.1.0 (by /u/yardz360)')
+reddit = praw.Reddit(client_id=os.environ['REDDIT_CLIENT_ID'], client_secret=os.environ['REDDIT_CLIENT_SECRET'], user_agent='web:com.gamedealsnotifierapp:v0.1.0 (by /u/yardz360)')
 
 # Page Access Token from FB
-PAT = 'EAAGojsu8t7UBAIX7BaQkj5rWvyNvXWoRP8coZBWUN81VxQaOyl7HTIiV4ZBYQQav5fXFwlE8LSH56vRcqZAvGTcKerVVf010hqlotVzUpGh38Jt4eTwte5zIvza6pwKeIwa1Ut2AOYnloLirLPLoZCDvA2bNElrpd24X5oF9qQZDZD'
+PAT = os.environ['PAGE_ACCESS_TOKEN']
 
 #Temporary. TODO: Figure out how to auto-send notifications without requiring user message first
 quick_reply_list = [
