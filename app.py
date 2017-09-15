@@ -133,7 +133,10 @@ def send_messages_for_subreddit(subreddit_name, user, text):
 
     if not newContent:
         payload = "No new deals since last update for " + text + "."
-        post_message(payload, user.name)
+    else:
+        payload = "Those are all of the new deals for " + text + " at the moment."
+
+    post_message(payload, user.name)
 
 def post_message(payload, recipient):
     r = requests.post("https://graph.facebook.com/v2.6/me/messages",
