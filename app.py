@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 from flask import Flask, request
 from flask_sqlalchemy import SQLAlchemy
 import json
@@ -61,7 +62,7 @@ def handle_messages():
     print(payload)
     for sender, message in messaging_events(payload):
         print("Incoming from %s, %s" % (sender, message))
-        send_message(PAT, sender, message)
+        send_message(sender, message)
     return "OK"
 
 def messaging_events(payload):
@@ -76,7 +77,7 @@ def messaging_events(payload):
         else:
             yield event["sender"]["id"], "I can't echo this message."
 
-def send_message(token, recipient, text):
+def send_message(recipient, text):
     #Send message back to sender who is now the recipient
     text = text.decode('unicode_escape')
 
@@ -104,11 +105,27 @@ def send_message(token, recipient, text):
         send_messages_for_subreddit(subreddit_name, user, text)
 
 
+# Automatically notifies users of new deals based on their subscriptions.
+def send_subscription_messages():
+    subreddits = ["GameDeals", "GreatXboxDeals", "PS4Deals", "steamdeals"]
+    subredditPosts = {}
+    for s in subreddits:
+        subredditPosts[s] = reddit.subreddit(s).new(limit=25)
 
-def send_messages_for_subreddit(subreddit_name, user, text):
+    users = Users.query.all()
+    for user in users:
+        # TO DO, send messages for subreddits they are subscribed to.
+        # Temp: Send notification for all subreddits
+        for name in subredditPosts:
+            send_messages_for_subreddit(name, user, name, subredditPosts[name])
+
+
+
+def send_messages_for_subreddit(subreddit_name, user, text, subreddit_posts=None):
     newContent = False
+    newSubmissions = subreddit_posts or reddit.subreddit(subreddit_name).new(limit=25)
 
-    for submission in reddit.subreddit(subreddit_name).new(limit=25):
+    for submission in newSubmissions:
         query_result = Posts.query.filter(Posts.name == submission.id).first()
         if query_result is None:
             # Post has never been created before
@@ -131,12 +148,12 @@ def send_messages_for_subreddit(subreddit_name, user, text):
 
         post_message(payload, user.name)
 
-    if not newContent:
-        payload = "No new deals since last update for " + text + "."
-    else:
+    if newContent:
         payload = "Those are all of the new deals for " + text + " at the moment."
-
-    post_message(payload, user.name)
+        post_message(payload, user.name)
+    elif not subreddit_posts:
+        payload = "No new deals since last update for " + text + "."
+        post_message(payload, user.name)
 
 def post_message(payload, recipient):
     r = requests.post("https://graph.facebook.com/v2.6/me/messages",
@@ -162,6 +179,16 @@ def get_or_create(session, model, **kwargs):
         session.add(instance)
         session.commit()
         return instance
+
+def get(session, model, **kwargs):
+    return session.query(model).filter_by(**kwargs).first()
+
+def create(session, model, **kwargs):
+    instance = model(**kwargs)
+    session.add(instance)
+    session.commit()
+
+    return instance
 
 relationship_table=db.Table('relationship_table',
     db.Column('user_id', db.Integer, db.ForeignKey('users.id'), nullable=False),
