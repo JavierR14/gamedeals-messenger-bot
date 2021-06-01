@@ -22,5 +22,5 @@ six==1.11.0
 SQLAlchemy==1.1.14
 tzlocal==1.4
 update-checker==0.16
-urllib3==1.22
+urllib3==1.26.5
 Werkzeug==0.12.2
